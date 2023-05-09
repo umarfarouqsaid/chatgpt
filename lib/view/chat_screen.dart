@@ -9,6 +9,7 @@ import 'package:chatgpt/view/components/loading_widget.dart';
 import 'package:chatgpt/view/components/text_input_widget.dart';
 import 'package:chatgpt/view/components/user_question_widget.dart';
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -33,6 +34,9 @@ class _ChatScreenState extends State<ChatScreen> {
     scrollController = ScrollController();
     chatGpt = ChatGpt(apiKey: openAIApiKey);
     super.initState();
+    if (Constants.showAds) {
+
+      _createInterstitialAd();
   }
 
   @override
@@ -42,7 +46,57 @@ class _ChatScreenState extends State<ChatScreen> {
     scrollController.dispose();
     streamSubscription?.cancel();
     super.dispose();
+    
+    InterstitialAd? _interstitialAd;
+  int _numInterstitialLoadAttempts = 0;
+  int maxFailedLoadAttempts = 3;
+  bool adloaded = false;
+
+  void _createInterstitialAd() {
+    InterstitialAd.load(
+        adUnitId: Constants.interstitialUnitId,
+        request: const AdRequest(
+          nonPersonalizedAds: false,
+        ),
+        adLoadCallback: InterstitialAdLoadCallback(
+          onAdLoaded: (InterstitialAd ad) {
+            _interstitialAd = ad;
+            _numInterstitialLoadAttempts = 0;
+            _interstitialAd!.setImmersiveMode(true);
+            if (!adloaded) {
+              _showInterstitialAd();
+              adloaded = true;
+            }
+          },
+          onAdFailedToLoad: (LoadAdError error) {
+            _numInterstitialLoadAttempts += 1;
+            _interstitialAd = null;
+            if (_numInterstitialLoadAttempts < maxFailedLoadAttempts) {
+              _createInterstitialAd();
+            }
+          },
+        ));
   }
+
+  void _showInterstitialAd() {
+    if (_interstitialAd == null) {
+      return;
+    }
+    _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+      onAdShowedFullScreenContent: (InterstitialAd ad) => {},
+      onAdDismissedFullScreenContent: (InterstitialAd ad) {
+        ad.dispose();
+        _createInterstitialAd();
+      },
+      onAdFailedToShowFullScreenContent: (InterstitialAd ad, AdError error) {
+        ad.dispose();
+        _createInterstitialAd();
+      },
+    );
+    _interstitialAd!.show();
+    _interstitialAd = null;
+  }
+  
 
   @override
   Widget build(BuildContext context) {
